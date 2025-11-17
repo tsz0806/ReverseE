@@ -1,0 +1,251 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: advanced-chat
+  name: Multi
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.4.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_size_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: http-request
+      id: 1763388362823-source-1763388386458-target
+      source: '1763388362823'
+      sourceHandle: source
+      target: '1763388386458'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: 1763388386458-source-1763388767547-target
+      source: '1763388386458'
+      sourceHandle: source
+      target: '1763388767547'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: answer
+      id: 1763388767547-source-answer-target
+      source: '1763388767547'
+      sourceHandle: source
+      target: answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 開始
+        type: start
+        variables:
+        - default: ''
+          hide: true
+          hint: ''
+          label: grok_conversation_id
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: grok_conversation_id
+        - default: ''
+          hide: true
+          hint: ''
+          label: grok_response_id
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: grok_response_id
+      height: 114
+      id: '1763388362823'
+      position:
+        x: 84.54714969953113
+        y: 288.3526269403197
+      positionAbsolute:
+        x: 84.54714969953113
+        y: 288.3526269403197
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#1763388767547.answer#}}'
+        selected: false
+        title: 直接回覆
+        type: answer
+        variables: []
+      height: 103
+      id: answer
+      position:
+        x: 1025.5833771643706
+        y: 288.3526269403197
+      positionAbsolute:
+        x: 1025.5833771643706
+        y: 288.3526269403197
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: key-value-389
+            key: ''
+            type: text
+            value: "{\n  \"message\": \"{{#sys.query#}}\",\n  \"conversation_id\"\
+              : \"{{#1763388362823.grok_conversation_id#}}\",\n  \"parent_response_id\"\
+              : \"{{#1763388362823.grok_response_id#}}\"\n}"
+          type: json
+        headers: Content-Type:application/json
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: grok_api
+        type: http-request
+        url: https://ea9a969e-225b-4348-b69d-fef3765e7c0b-00-qub7c5x6g8e.pike.replit.dev/api/chat
+        variables: []
+      height: 169
+      id: '1763388386458'
+      position:
+        x: 377.7629191855155
+        y: 288.3526269403197
+      positionAbsolute:
+        x: 377.7629191855155
+        y: 288.3526269403197
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(api_response: str) -> dict:\n    \"\"\"\n \
+          \   更新對話上下文\n    從 API 回應中提取 conversation_id 和 response_id\n    \"\"\"\n\
+          \    try:\n        # 解析 API 回應\n        data = json.loads(api_response)\
+          \ if isinstance(api_response, str) else api_response\n        \n       \
+          \ if data.get(\"success\"):\n            result_data = data.get(\"data\"\
+          , {})\n            \n            # 更新對話變數（Dify 會自動保存這些值）\n            return\
+          \ {\n                \"answer\": result_data.get(\"response\", \"\"),\n\
+          \                \"new_conversation_id\": result_data.get(\"conversation_id\"\
+          , \"\"),\n                \"new_response_id\": result_data.get(\"response_id\"\
+          , \"\"),\n                \"is_new\": result_data.get(\"is_new_conversation\"\
+          , False)\n            }\n        else:\n            return {\n         \
+          \       \"answer\": f\"錯誤：{data.get('error', '未知錯誤')}\",\n             \
+          \   \"new_conversation_id\": \"\",\n                \"new_response_id\"\
+          : \"\",\n                \"is_new\": False\n            }\n    except Exception\
+          \ as e:\n        return {\n            \"answer\": f\"解析錯誤：{str(e)}\",\n\
+          \            \"new_conversation_id\": \"\",\n            \"new_response_id\"\
+          : \"\",\n            \"is_new\": False\n        }"
+        code_language: python3
+        outputs:
+          answer:
+            children: null
+            type: string
+          is_new:
+            children: null
+            type: boolean
+          new_conversation_id:
+            children: null
+            type: string
+          new_response_id:
+            children: null
+            type: string
+        selected: false
+        title: update_context
+        type: code
+        variables:
+        - value_selector:
+          - '1763388386458'
+          - body
+          value_type: string
+          variable: api_response
+      height: 52
+      id: '1763388767547'
+      position:
+        x: 699.0948312857198
+        y: 288.3526269403197
+      positionAbsolute:
+        x: 699.0948312857198
+        y: 288.3526269403197
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -203.0204787995923
+      y: 48.60349504205881
+      zoom: 0.6087830093314934
+  rag_pipeline_variables: []
