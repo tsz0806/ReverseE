@@ -38,9 +38,14 @@
 }
 ```
 
+<img src="/image/image03.png" width="100%">
+
 **訪問 `/docs`：**
 - 看到完整的 Swagger UI
 - 有 4 個端點：`/`, `/health`, `/api/chat`, `/test`
+
+<img src="/image/image04.png" width="100%">
+
 
 **訪問 `/health`：**
 ```json
