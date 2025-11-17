@@ -2,6 +2,7 @@
 
 > 本專案為作業用途，純紀錄，請勿模仿
 
+[![Built with](https://img.shields.io/badge/Built%20with-Stima%20API-blueviolet?logo=robot)](https://api.stima.tech)
 
 ## 📊 **資料流程圖**
 
