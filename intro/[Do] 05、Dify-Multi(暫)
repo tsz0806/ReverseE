@@ -1,0 +1,86 @@
+<div align="center">
+
+# 5️⃣ Dify部署 - 多輪聊天
+
+</div>
+
+## 第 1 步：創建空白的聊天流
+- **刪除**預設的 `LLM` 節點，我們將用 `HTTP 請求` 來取代它。
+
+## 第 2 步：添加並配置「HTTP 請求」節點
+
+> 這個節點負責呼叫我們部署在 Hugging Face 上的 API。
+
+1.  在 `開始` 節點之後，從右側工具箱中拖入一個 `工具` -> `HTTP 請求` 節點。
+2.  點擊這個新節點，在右側進行配置：
+    *   **請求方法 (Method):** `POST`
+    *   **URL:** `https://2hf2hf-deploy-multi.hf.space/api/chat`
+    *   **Headers:**
+        *   `Content-Type`: `application/json`
+    *   **Body:**
+        *   **類型:** 選擇 `JSON`
+        *   **內容 (貼入以下 JSON):**
+            ```json
+            {
+              "message": "{{#sys.query#}}"
+            }
+            ```
+            這裡的 `{{sys.query}}` 是 Dify 的系統變數，代表用戶的當前輸入。
+
+## 第 4 步：添加「程式碼」節點來處理響應和更新狀態
+
+> 這個節點是整個工作流的大腦，負責解析 API 的返回結果。
+
+1.  輸入變量
+
+    `api_response (string) = {{#HTTP请求1.body#}}`
+
+2.  程式碼
+   
+    ```python
+    import json
+    
+    def main(api_response: str) -> dict:
+        """
+        解析 API 响应
+        """
+        try:
+            # 将字符串解析为 JSON
+            data = json.loads(api_response)
+            
+            # 检查是否成功
+            if data.get("success"):
+                return {
+                    "response": data.get("data", {}).get("response", "无响应内容"),
+                    "conversation_id": data.get("data", {}).get("conversation_id", ""),
+                    "response_id": data.get("data", {}).get("response_id", "")
+                }
+            else:
+                return {
+                    "response": f"错误：{data.get('error', '未知错误')}",
+                    "conversation_id": "",
+                    "response_id": ""
+                }
+        
+        except json.JSONDecodeError:
+            return {
+                "response": "JSON 解析失败",
+                "conversation_id": "",
+                "response_id": ""
+            }
+        except Exception as e:
+            return {
+                "response": f"处理错误：{str(e)}",
+                "conversation_id": "",
+                "response_id": ""
+            }
+    ```
+
+3. **输出变量：**
+- `response` (string)
+- `conversation_id` (string)
+- `response_id` (string)
+
+## 第 5 步：配置「回答」節點
+
+- 選擇 `程式碼` 節點的 `response` 輸出。
