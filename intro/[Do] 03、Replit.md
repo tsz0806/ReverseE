@@ -39,4 +39,29 @@
 
 <img src="/image/image05.png" width="100%">
 
+---
 
+<div align="center">
+
+# ✨ Replit 有修改的地方
+
+</div>
+
+我剛剛為了讓這個專案能在 Replit 環境中運行，做了以下修改：
+
+## 🟢 修改的檔案：main.py - 只修改了一個地方：
+   
+   - 將預設端口從 8000 改為 5000（Replit 的標準 web 端口）
+   - 第 438 行：port = int(os.environ.get("PORT", 5000))
+
+## 🟢 新增的檔案：
+- .gitignore - 新增 Python 專案的 gitignore 規則
+   - 包含 Python、虛擬環境、IDE、日誌等常見的忽略項目
+- replit.md - 新增專案文檔
+   - 記錄專案概述、技術架構、API 端點、使用方法等資訊
+   - 方便日後查看專案結構
+
+## 🟢 其他配置：
+- 安裝了 Python 3.11 和所有依賴套件（fastapi、uvicorn、requests 等）
+- 設置了工作流程（Workflow）來自動運行 python main.py
+- 配置了部署設置，使用 autoscale 模式
