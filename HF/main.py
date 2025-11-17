@@ -37,6 +37,8 @@ HEADERS = {
     "Referer": "https://grok.ylsagi.com/",
 }
 
+PARENTRESPONSEID = "324a5c10-d3e5-4a53-af7a-7baa4edac04b"
+
 # --- 請求模型 ---
 class ChatRequest(BaseModel):
     message: str
@@ -53,7 +55,7 @@ def build_payload(prompt: str, model: str = "grok-3"):
         "message": prompt,
         "model": model,
         "mode": "auto",
-        "parentResponseId": "f50ce991-0ab4-4a78-ba6d-440f7e628484",
+        "parentResponseId": PARENTRESPONSEID,
         "customPersonality": "",
         "disableArtifact": False,
         "disableMemory": False,
