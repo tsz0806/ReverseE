@@ -7,13 +7,12 @@ import json
 import uuid
 import logging
 
-# 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Grok Mirror API",
-    version="3.1.0"
+    version="3.3.0"
 )
 
 app.add_middleware(
@@ -76,7 +75,9 @@ def build_payload(message: str, model: str = "grok-3") -> dict:
     }
 
 def parse_streaming_response(response) -> Dict[str, Any]:
-    """改进的解析函数，带调试日志"""
+    """
+    修复后的解析函数 - 处理嵌套的 response 对象
+    """
     full_response = ""
     response_id = None
     conversation_id = None
@@ -91,7 +92,7 @@ def parse_streaming_response(response) -> Dict[str, Any]:
                 try:
                     line_str = line.decode('utf-8')
                     
-                    # 记录前5行用于调试
+                    # 记录前5行
                     if line_count <= 5:
                         logger.info(f"Line {line_count}: {line_str[:200]}")
                     
@@ -100,47 +101,64 @@ def parse_streaming_response(response) -> Dict[str, Any]:
                     if "result" in data:
                         result = data["result"]
                         
-                        # 提取 token
-                        token = result.get("token")
-                        if token:
-                            full_response += token
-                            logger.debug(f"Added token: {token}")
+                        # ===== 关键修复：处理嵌套的 response 对象 =====
                         
-                        # 获取 IDs
-                        if "responseId" in result:
-                            response_id = result["responseId"]
-                            logger.debug(f"Got responseId: {response_id}")
+                        # 方法1：从 result.response 中提取
+                        if "response" in result:
+                            inner_response = result["response"]
+                            
+                            # 提取 token（在嵌套的 response 中）
+                            if "token" in inner_response:
+                                token = inner_response["token"]
+                                if token:
+                                    full_response += token
+                                    logger.debug(f"Found token: {token}")
+                            
+                            # 提取 responseId
+                            if "responseId" in inner_response:
+                                response_id = inner_response["responseId"]
+                            
+                            # 检查完整消息（modelResponse）
+                            if "modelResponse" in inner_response:
+                                model_resp = inner_response["modelResponse"]
+                                if "message" in model_resp:
+                                    full_response = model_resp["message"]
+                                    logger.info(f"Got full message: {full_response[:100]}")
+                                if "responseId" in model_resp:
+                                    response_id = model_resp["responseId"]
+                            
+                            # 检查是否结束
+                            if inner_response.get("isSoftStop", False):
+                                logger.info("Received soft stop")
+                                break
+                        
+                        # 方法2：从 result.conversation 中提取对话ID
+                        if "conversation" in result:
+                            conv = result["conversation"]
+                            if "conversationId" in conv:
+                                conversation_id = conv["conversationId"]
+                                logger.info(f"Got conversationId: {conversation_id}")
+                        
+                        # 方法3：直接从 result 提取（兼容旧格式）
+                        if "token" in result:
+                            token = result["token"]
+                            if token:
+                                full_response += token
                         
                         if "conversationId" in result:
                             conversation_id = result["conversationId"]
-                            logger.debug(f"Got conversationId: {conversation_id}")
                         
-                        # 检查完整响应
-                        if "modelResponse" in result:
-                            model_resp = result["modelResponse"]
-                            msg = model_resp.get("message")
-                            if msg:
-                                full_response = msg
-                                logger.info(f"Got full message from modelResponse: {msg[:100]}")
-                            
-                            if "responseId" in model_resp:
-                                response_id = model_resp["responseId"]
-                            if "conversationId" in model_resp:
-                                conversation_id = model_resp["conversationId"]
-                        
-                        # 检查是否结束
-                        if result.get("isSoftStop", False):
-                            logger.info("Received soft stop signal")
-                            break
+                        if "responseId" in result:
+                            response_id = result["responseId"]
                 
                 except json.JSONDecodeError as e:
-                    logger.warning(f"JSON decode error on line {line_count}: {e}")
+                    logger.warning(f"JSON decode error: {e}")
                     continue
                 except Exception as e:
-                    logger.error(f"Error parsing line {line_count}: {e}")
+                    logger.error(f"Error parsing line: {e}")
                     continue
         
-        logger.info(f"Parsing completed. Total lines: {line_count}, Response length: {len(full_response)}")
+        logger.info(f"Parsing completed. Lines: {line_count}, Response length: {len(full_response)}")
         
     except Exception as e:
         logger.error(f"Error during iteration: {e}")
@@ -156,9 +174,8 @@ def parse_streaming_response(response) -> Dict[str, Any]:
 async def root():
     return {
         "name": "Grok Mirror API",
-        "version": "3.1.0",
-        "status": "running",
-        "debug": "Check /logs for detailed logging"
+        "version": "3.3.0 - Fixed nested response",
+        "status": "running"
     }
 
 @app.get("/health")
@@ -167,17 +184,14 @@ async def health():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """聊天端点（带调试日志）"""
+    """聊天端点 - 修复后的版本"""
     try:
         if not request.message:
             return ChatResponse(success=False, error="Message is required")
         
         logger.info(f"收到请求: {request.message}")
         
-        # 使用 /conversations/new 端点
         url = f"{GROK_BASE_URL}/rest/app-chat/conversations/new"
-        
-        # 构建请求
         payload = build_payload(request.message, request.model)
         
         headers = HEADERS.copy()
@@ -186,7 +200,6 @@ async def chat(request: ChatRequest):
         
         logger.info(f"发送请求到: {url}")
         
-        # 发送请求
         response = requests.post(
             url,
             headers=headers,
@@ -203,16 +216,15 @@ async def chat(request: ChatRequest):
             logger.info(f"解析结果: response_length={len(result.get('response', ''))}, line_count={result.get('debug_line_count', 0)}")
             
             if not result.get("response"):
-                # 如果没有响应，返回调试信息
                 return ChatResponse(
                     success=False,
-                    error="No response received from Grok",
+                    error="No response text extracted",
                     data={
                         "debug_info": {
                             "lines_processed": result.get("debug_line_count", 0),
                             "response_id": result.get("response_id"),
                             "conversation_id": result.get("conversation_id"),
-                            "hint": "Check Hugging Face Logs for details"
+                            "hint": "检查 Logs 获取详细信息"
                         }
                     }
                 )
