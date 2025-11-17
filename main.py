@@ -428,15 +428,9 @@ async def chat(request: ChatRequest):
 # ================================
 # 第八部分：啟動伺服器
 # ================================
-
 if __name__ == "__main__":
-    """
-    只在直接執行這個檔案時執行
-    在 Hugging Face Space 上不會執行這部分
-    （因為 Hugging Face 會用其他方式啟動）
-    """
     import uvicorn
-    # 啟動 FastAPI 應用程式
-    # host="0.0.0.0" 表示接受來自任何 IP 的連線
-    # port=7860 是 Hugging Face Space 的標準埠號
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    import os
+    # Koyeb 會提供 PORT 環境變數
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
