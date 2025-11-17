@@ -65,3 +65,54 @@
 - 安裝了 Python 3.11 和所有依賴套件（fastapi、uvicorn、requests 等）
 - 設置了工作流程（Workflow）來自動運行 python main.py
 - 配置了部署設置，使用 autoscale 模式
+
+<div align="center">
+
+# ✨ Replit2 有修改的地方
+
+</div>
+
+我為了讓這個項目在 Replit 環境中運行，做了以下的修改和設置：
+
+## 🟢 修改的檔案
+1. main.py (修改)
+   
+   - 修改內容：將端口從 7860 改為 5000
+   - 位置：檔案最後一行
+   - 原因：Replit 環境需要使用 5000 端口來顯示網頁預覽
+
+```python
+# 修改前
+uvicorn.run(app, host="0.0.0.0", port=7860)
+
+# 修改後
+uvicorn.run(app, host="0.0.0.0", port=5000)
+```
+
+## 🟢 新建的檔案
+2. .gitignore (新建)
+   
+   - 為 Python 項目添加了標準的忽略規則
+   - 包含：__pycache__/, *.pyc, 虛擬環境, IDE 設定檔等
+
+
+3. replit.md (新建)
+
+   - 項目文檔和架構說明
+   - 記錄了 API 端點、功能特性、技術堆疊等信息
+   - 用於記錄項目歷史和用戶偏好
+
+## 🟢 其他配置
+### 安裝依賴
+安裝了 Python 3.11
+安裝了所有 requirements.txt 中的套件：
+
+### 工作流程設置
+配置了「FastAPI Server」工作流程
+命令：python main.py
+端口：5000
+狀態：✅ 正在運行中
+
+### 部署配置
+設定為 autoscale 部署模式
+適合無狀態的 API 服務
