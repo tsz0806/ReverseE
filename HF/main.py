@@ -5,11 +5,15 @@ from typing import Optional, Dict, Any
 import requests
 import json
 import uuid
+import logging
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Grok Mirror API",
-    description="API proxy for Grok using correct endpoint",
-    version="3.0.0"
+    version="3.1.0"
 )
 
 app.add_middleware(
@@ -20,7 +24,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 配置 ---
 GROK_BASE_URL = "https://grok.ylsagi.com"
 
 HEADERS = {
@@ -31,7 +34,6 @@ HEADERS = {
     "Referer": "https://grok.ylsagi.com/",
 }
 
-# --- 请求/响应模型 ---
 class ChatRequest(BaseModel):
     message: str
     model: Optional[str] = "grok-3"
@@ -41,9 +43,7 @@ class ChatResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
-# --- 构建请求负载（使用正确的格式）---
 def build_payload(message: str, model: str = "grok-3") -> dict:
-    """根据实际请求构建 payload"""
     return {
         "disableMemory": False,
         "disableSearch": False,
@@ -75,96 +75,116 @@ def build_payload(message: str, model: str = "grok-3") -> dict:
         "toolOverrides": {}
     }
 
-# --- 解析流式响应 ---
 def parse_streaming_response(response) -> Dict[str, Any]:
-    """解析 Grok 的流式响应"""
+    """改进的解析函数，带调试日志"""
     full_response = ""
     response_id = None
     conversation_id = None
+    line_count = 0
     
-    for line in response.iter_lines():
-        if line:
-            try:
-                line_str = line.decode('utf-8')
-                data = json.loads(line_str)
-                
-                if "result" in data:
-                    result = data["result"]
+    logger.info("开始解析流式响应...")
+    
+    try:
+        for line in response.iter_lines():
+            if line:
+                line_count += 1
+                try:
+                    line_str = line.decode('utf-8')
                     
-                    # 提取 token
-                    if "token" in result and result["token"]:
-                        full_response += result["token"]
+                    # 记录前5行用于调试
+                    if line_count <= 5:
+                        logger.info(f"Line {line_count}: {line_str[:200]}")
                     
-                    # 获取 IDs
-                    if "responseId" in result:
-                        response_id = result["responseId"]
+                    data = json.loads(line_str)
                     
-                    if "conversationId" in result:
-                        conversation_id = result["conversationId"]
-                    
-                    # 检查是否结束
-                    if result.get("isSoftStop", False):
-                        break
-                    
-                    # 从 modelResponse 获取完整消息
-                    if "modelResponse" in result:
-                        model_resp = result["modelResponse"]
-                        if "message" in model_resp:
-                            full_response = model_resp["message"]
-                        if "responseId" in model_resp:
-                            response_id = model_resp["responseId"]
-                        if "conversationId" in model_resp:
-                            conversation_id = model_resp["conversationId"]
+                    if "result" in data:
+                        result = data["result"]
+                        
+                        # 提取 token
+                        token = result.get("token")
+                        if token:
+                            full_response += token
+                            logger.debug(f"Added token: {token}")
+                        
+                        # 获取 IDs
+                        if "responseId" in result:
+                            response_id = result["responseId"]
+                            logger.debug(f"Got responseId: {response_id}")
+                        
+                        if "conversationId" in result:
+                            conversation_id = result["conversationId"]
+                            logger.debug(f"Got conversationId: {conversation_id}")
+                        
+                        # 检查完整响应
+                        if "modelResponse" in result:
+                            model_resp = result["modelResponse"]
+                            msg = model_resp.get("message")
+                            if msg:
+                                full_response = msg
+                                logger.info(f"Got full message from modelResponse: {msg[:100]}")
                             
-            except json.JSONDecodeError:
-                continue
-            except Exception as e:
-                print(f"Error parsing line: {e}")
+                            if "responseId" in model_resp:
+                                response_id = model_resp["responseId"]
+                            if "conversationId" in model_resp:
+                                conversation_id = model_resp["conversationId"]
+                        
+                        # 检查是否结束
+                        if result.get("isSoftStop", False):
+                            logger.info("Received soft stop signal")
+                            break
+                
+                except json.JSONDecodeError as e:
+                    logger.warning(f"JSON decode error on line {line_count}: {e}")
+                    continue
+                except Exception as e:
+                    logger.error(f"Error parsing line {line_count}: {e}")
+                    continue
+        
+        logger.info(f"Parsing completed. Total lines: {line_count}, Response length: {len(full_response)}")
+        
+    except Exception as e:
+        logger.error(f"Error during iteration: {e}")
     
     return {
         "response": full_response,
         "response_id": response_id,
-        "conversation_id": conversation_id
+        "conversation_id": conversation_id,
+        "debug_line_count": line_count
     }
-
-# ========== API 路由 ==========
 
 @app.get("/")
 async def root():
-    """根路径"""
     return {
         "name": "Grok Mirror API",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "status": "running",
-        "endpoint": "/rest/app-chat/conversations/new",
-        "note": "使用正确的 API 端点"
+        "debug": "Check /logs for detailed logging"
     }
 
 @app.get("/health")
 async def health():
-    """健康检查"""
-    return {"status": "healthy", "service": "grok-mirror-api"}
+    return {"status": "healthy"}
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """
-    聊天端点
-    使用 /conversations/new 端点，每次都是新对话
-    """
+    """聊天端点（带调试日志）"""
     try:
         if not request.message:
             return ChatResponse(success=False, error="Message is required")
         
-        # 使用正确的端点
+        logger.info(f"收到请求: {request.message}")
+        
+        # 使用 /conversations/new 端点
         url = f"{GROK_BASE_URL}/rest/app-chat/conversations/new"
         
-        # 构建请求体
+        # 构建请求
         payload = build_payload(request.message, request.model)
         
-        # 准备请求头
         headers = HEADERS.copy()
         headers["x-xai-request-id"] = str(uuid.uuid4())
         headers["x-statsig-id"] = "JdqGp+hE6q0WsMpDDLRldv0O6ZNb+Mny24KLm/R/9pJdezRyT5a+PbxEdMFEOTVSTrW47iG05JO2DhUM3iJUk/pqbz4SJg"
+        
+        logger.info(f"发送请求到: {url}")
         
         # 发送请求
         response = requests.post(
@@ -175,13 +195,26 @@ async def chat(request: ChatRequest):
             timeout=60
         )
         
+        logger.info(f"收到响应，状态码: {response.status_code}")
+        
         if response.status_code == 200:
             result = parse_streaming_response(response)
             
+            logger.info(f"解析结果: response_length={len(result.get('response', ''))}, line_count={result.get('debug_line_count', 0)}")
+            
             if not result.get("response"):
+                # 如果没有响应，返回调试信息
                 return ChatResponse(
                     success=False,
-                    error="No response received from Grok"
+                    error="No response received from Grok",
+                    data={
+                        "debug_info": {
+                            "lines_processed": result.get("debug_line_count", 0),
+                            "response_id": result.get("response_id"),
+                            "conversation_id": result.get("conversation_id"),
+                            "hint": "Check Hugging Face Logs for details"
+                        }
+                    }
                 )
             
             return ChatResponse(
@@ -193,31 +226,20 @@ async def chat(request: ChatRequest):
                 }
             )
         else:
+            error_text = response.text[:200]
+            logger.error(f"HTTP错误 {response.status_code}: {error_text}")
             return ChatResponse(
                 success=False,
                 error=f"Request failed with status {response.status_code}",
-                data={"details": response.text[:200]}
+                data={"details": error_text}
             )
             
     except requests.Timeout:
-        return ChatResponse(
-            success=False,
-            error="Request timeout"
-        )
+        logger.error("请求超时")
+        return ChatResponse(success=False, error="Request timeout")
     except Exception as e:
-        return ChatResponse(
-            success=False,
-            error=f"Error: {str(e)}"
-        )
-
-@app.get("/test")
-async def test():
-    """测试端点"""
-    return {
-        "message": "API is working!",
-        "correct_endpoint": "/rest/app-chat/conversations/new",
-        "test": "Use POST /api/chat with {\"message\": \"Hello\"}"
-    }
+        logger.error(f"未知错误: {str(e)}", exc_info=True)
+        return ChatResponse(success=False, error=f"Error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
