@@ -1,1 +1,1 @@
----title: Deployemoji: 🐨colorFrom: redcolorTo: graysdk: dockerpinned: false---Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+---title: Deployemoji: 🐨colorFrom: redcolorTo: graysdk: dockerpinned: false---
