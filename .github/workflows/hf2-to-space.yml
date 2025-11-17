@@ -39,7 +39,7 @@ jobs:
           git clone "https://oauth:$HF_TOKEN@huggingface.co/spaces/$SPACE_NAME" hf2_space_temp
           
           # 清空临时文件夹中的旧文件（除了 .git 目录）
-          find hf_space_temp -mindepth 1 -not -path "hf2_space_temp/.git/*" -not -name ".git" -exec rm -rf {} +
+          find hf2_space_temp -mindepth 1 -not -path "hf2_space_temp/.git/*" -not -name ".git" -exec rm -rf {} +
           
           # 将 HF2 文件夹中的新文件复制到临时文件夹
           cp -r HF2/* hf2_space_temp/
