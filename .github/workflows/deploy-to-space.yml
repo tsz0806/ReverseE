@@ -1,39 +1,58 @@
 name: Sync HF folder to Hugging Face Space
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'HF/**'  # 只在 HF 資料夾及其子檔案變動時觸發
+  push:
+    branches:
+      - main
+    paths:
+      - 'HF/**'  # 只在 HF 資料夾及其子檔案變動時觸發
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+  deploy-to-hugging-face:
+    runs-on: ubuntu-latest
+    steps:
+      - name:  checkout
+        uses: actions/checkout@v3
 
-      - name: Debug - list repo files
-        run: |
-          echo "📂 Repository root:"
-          ls -la
-          echo "📂 HF folder:"
-          ls -la HF || echo "⚠️ HF is missing or empty"
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Push HF folder to Hugging Face
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          cd HF
-          git init
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          git remote add space https://user:$HF_TOKEN@huggingface.co/spaces/2hf2hf/deploy
-          git checkout -b main
-          git add .
-          git commit -m "Deploy HF folder only"
-          git push --force space main
+      - name: Debug - Show directory structure
+        run: |
+          echo "Listing files in the root directory:"
+          ls -R
 
+      - name: Deploy to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE_NAME: "2hf2hf/deploy"
+        run: |
+          # 检查 HF 文件夹是否存在
+          if [ ! -d "HF" ]; then
+            echo "Error: 'HF' directory not found!"
+            exit 1
+          fi
+
+          # 克隆 Hugging Face Space 仓库到一个临时文件夹
+          git clone "https://oauth:$HF_TOKEN@huggingface.co/spaces/$SPACE_NAME" hf_space_temp
+          
+          # 清空临时文件夹中的旧文件（除了 .git 目录）
+          find hf_space_temp -mindepth 1 -not -path "hf_space_temp/.git/*" -not -name ".git" -exec rm -rf {} +
+          
+          # 将 HF 文件夹中的新文件复制到临时文件夹
+          cp -r HF/* hf_space_temp/
+          
+          # 进入临时文件夹并提交推送
+          cd hf_space_temp
+          
+          # 检查是否有文件变动
+          if [[ -z $(git status -s) ]]; then
+            echo "No changes to deploy. Exiting."
+            exit 0
+          fi
+          
+          git add .
+          git commit -m "Deploy from GitHub Actions: $(date)"
+          git push
