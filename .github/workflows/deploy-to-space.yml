@@ -1,0 +1,39 @@
+name: Sync HF folder to Hugging Face Space
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'HF/**'  # 只在 HF 資料夾及其子檔案變動時觸發
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Debug - list repo files
+        run: |
+          echo "📂 Repository root:"
+          ls -la
+          echo "📂 HF folder:"
+          ls -la HF || echo "⚠️ HF is missing or empty"
+
+      - name: Push HF folder to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          cd HF
+          git init
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git remote add space https://user:$HF_TOKEN@huggingface.co/spaces/2hf2hf/deploy
+          git checkout -b main
+          git add .
+          git commit -m "Deploy HF folder only"
+          git push --force space main
+
